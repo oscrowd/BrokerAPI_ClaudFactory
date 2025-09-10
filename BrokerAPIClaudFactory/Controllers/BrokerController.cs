@@ -66,6 +66,7 @@ namespace BrokerAPIClaudFactory.Controllers
         public async Task<IActionResult> AdvancedRequest2(FileSystemRequestContract request)
         {
             string key = string.Empty;
+            Object obj;
             try
             {
                 var result = await _broker.ProcessRequestUnionAsync(request);
@@ -73,11 +74,11 @@ namespace BrokerAPIClaudFactory.Controllers
                 if (!result.IsNewRequest)
                 {
                     // Для схлопнутого запроса просто ждем ответа
-                    Console.WriteLine($"Request uinion {result.Key} {result.Message}");
+                    _logger.WriteError($"Request uinion {result.Key} {result.Message}");
                 }
                 else
                 {
-                    Console.WriteLine($"New request: {result.Key}");
+                    _logger.WriteError($"New request: {result.Key}");
                 }
 
                 // Все клиенты ждут ответа
@@ -90,17 +91,16 @@ namespace BrokerAPIClaudFactory.Controllers
                     return StatusCode(500, "Invalid response format");
                 }
 
-                // Очищаем файлы
-                //await _broker.CleanupUnionAsync(result.Key);
-
                 var responseBody = lines.Length > 1 ? string.Join("\n", lines[1..]) : string.Empty;
-
-                return StatusCode(statusCode, new
+    
+                obj= new
                 {
                     Response = responseBody,
                     WasCollapsed = !result.IsNewRequest,
                     RequestKey = result.Key
-                });
+                };
+
+                
             }
             catch (TimeoutException ex)
             {
@@ -114,12 +114,8 @@ namespace BrokerAPIClaudFactory.Controllers
             {
                 await _broker.CleanupUnionAsync(key);
             }
-
+            if (obj != null) return StatusCode(200, obj);
+            else return StatusCode(500, "Error broker algorithm");
         }
-
-
-
-
-
     }
 }
