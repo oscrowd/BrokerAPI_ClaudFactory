@@ -1,0 +1,6 @@
+@BrokerAPIClaudFactory_HostAddress = http://localhost:5288
+
+GET {{BrokerAPIClaudFactory_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

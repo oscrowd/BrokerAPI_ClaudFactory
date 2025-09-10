@@ -1,0 +1,6 @@
+curl --location 'http://localhost:5288/api/Broker/advanced' \
+--header 'Content-Type: application/json' \
+--data '{
+  "method": "POST",
+  "path": "http://localhost:5288/api/Broker/process"
+}'
