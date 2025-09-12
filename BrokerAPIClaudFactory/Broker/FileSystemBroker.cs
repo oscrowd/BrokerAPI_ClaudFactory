@@ -115,13 +115,18 @@ namespace BrokerAPIClaudFactory.Broker
         {
             lock (_lockObject)
             {
-                // Удаляем запрос из активных
-                _activeRequests.TryRemove(key, out _);
+                if (_activeRequests.TryGetValue(key, out var existingRequest))
+                {
+                
+                existingRequest.WaitingClients--;
                 var requestFile = Path.Combine(_baseDirectory, $"{key}.req");
                 var responseFile = Path.Combine(_baseDirectory, $"{key}.resp");
 
-                try
-                {
+               if (existingRequest.WaitingClients  <=0)
+               {
+               _activeRequests.TryRemove(key, out _);
+               try
+        try     {
                     if (File.Exists(requestFile))
                         File.Delete(requestFile);
 
@@ -132,7 +137,8 @@ namespace BrokerAPIClaudFactory.Broker
                 {
                     // Игнорируем ошибки удаления файлов
                 }
-            }
+                }
+            }}
 
             
         }
