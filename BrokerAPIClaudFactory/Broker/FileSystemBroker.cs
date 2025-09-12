@@ -24,7 +24,7 @@ namespace BrokerAPIClaudFactory.Broker
                 if (_activeRequests.TryGetValue(key, out var existingRequest))
                 {
                     // Добавляем клиента в список ожидающих ответа
-                    existingRequest.WaitingClients.Add(GetClientIdentifier());
+                    existingRequest.WaitingClients.Add(GetClientIdentifier() + key);
                     // Удалить лог
                     Console.WriteLine($"Request union. Waiting ... {existingRequest.WaitingClients.Count} clients waiting.");
                     return new FileSystemResponseContract
@@ -43,7 +43,7 @@ namespace BrokerAPIClaudFactory.Broker
                     Method = request.Method,
                     Path = request.Path,
                     CreatedAt = DateTime.UtcNow,
-                    WaitingClients = new List<string> { GetClientIdentifier() }
+                    WaitingClients = new List<string> { GetClientIdentifier() + key }
                 };
 
                 _activeRequests[key] = requestInfo;
@@ -72,6 +72,7 @@ namespace BrokerAPIClaudFactory.Broker
                 {
                     if (File.Exists(responseFile))
                     {
+                        
                         var responseContent = await File.ReadAllTextAsync(responseFile);
                         return responseContent;
                     }
@@ -87,21 +88,46 @@ namespace BrokerAPIClaudFactory.Broker
         }
         public override async Task<string> WaitForResponseUnionAsync(string key, int timeoutMs = 180000)
         {
+            
             var responseFile = Path.Combine(_baseDirectory, $"{key}.resp");
             var cts = new CancellationTokenSource(timeoutMs);
 
             try
             {
+                
                 // Ожидаем появления файла ответа
                 while (!cts.Token.IsCancellationRequested)
                 {
+                     
                     if (File.Exists(responseFile))
                     {
-                        var responseContent = await File.ReadAllTextAsync(responseFile);
-                        return responseContent;
+                        Thread.Sleep(500);
+                        //lock (_lockObject)
+                        var strRet = string.Empty;
+                        await _semaphore.WaitAsync();
+                        try
+                        {
+                            try
+                            {
+                                Thread.Sleep(500);
+                                strRet = strRet ==String.Empty ? await File.ReadAllTextAsync(responseFile) : strRet;
+                                Thread.Sleep(500);
+                                return strRet;
+                            }
+                            catch (Exception ex)
+                            {
+                                throw ex;
+                            }
+                        }
+                        finally
+                        {
+                            _semaphore.Release();
+                        }
                     }
+                    //}
                     await Task.Delay(100, cts.Token);
-                }
+                
+                    }
             }
             catch (OperationCanceledException)
             {
@@ -115,25 +141,38 @@ namespace BrokerAPIClaudFactory.Broker
         {
             lock (_lockObject)
             {
-                // Удаляем запрос из активных
-                _activeRequests.TryRemove(key, out _);
-                var requestFile = Path.Combine(_baseDirectory, $"{key}.req");
-                var responseFile = Path.Combine(_baseDirectory, $"{key}.resp");
-
-                try
+                if (_activeRequests.TryGetValue(key, out var existingRequest))
                 {
-                    if (File.Exists(requestFile))
-                        File.Delete(requestFile);
+                    // Удаляем запрос из активных
 
-                    if (File.Exists(responseFile))
-                        File.Delete(responseFile);
-                }
-                catch (IOException)
-                {
-                    // Игнорируем ошибки удаления файлов
+
+                    existingRequest.WaitingClients.Remove(existingRequest.WaitingClients.FirstOrDefault(x=>x.Contains(key))); 
+                    var requestFile = Path.Combine(_baseDirectory, $"{key}.req");
+                    var responseFile = Path.Combine(_baseDirectory, $"{key}.resp");
+
+                    if (existingRequest.WaitingClients.Count < 1)
+                    {
+                        _activeRequests.TryRemove(key, out _);
+
+
+                        try
+                        {
+                            if (File.Exists(requestFile))
+                                File.Delete(requestFile);
+
+                            if (File.Exists(responseFile))
+                                File.Delete(responseFile);
+                        }
+                        catch (IOException)
+                        {
+                            // Игнорируем ошибки удаления файлов
+                        }
+
+                    }
+
+
                 }
             }
-
             
         }
         public override async Task CleanupAsync(string key)
@@ -159,7 +198,8 @@ namespace BrokerAPIClaudFactory.Broker
         private string GetClientIdentifier()
         {
             // Используем комбинацию из времени и GUID для идентификации клиента
-            return $"{DateTime.UtcNow:HHmmssfff}_{Guid.NewGuid():N}";
+            return $"{DateTime.UtcNow:HHmmssfff_}";
+            //return $"{DateTime.UtcNow:HHmmssfff}_{Guid.NewGuid():N}";
         }
         private async Task SaveRequestToFileAsync(IBrokerRequestContract request, string key, int timeoutMs = 180000)
         {

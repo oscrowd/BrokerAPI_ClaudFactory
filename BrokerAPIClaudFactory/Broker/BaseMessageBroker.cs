@@ -7,6 +7,7 @@ namespace BrokerAPIClaudFactory.Broker
     {
         protected readonly string _baseDirectory;
         protected readonly object _lockObject = new object();
+        protected readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
         protected readonly TimeSpan _requestTimeout = TimeSpan.FromSeconds(200000);
         protected readonly ConcurrentDictionary<string, RequestInfo> _activeRequests;
         public BaseMessageBroker(string baseDirectory="broker")
